@@ -11,6 +11,8 @@ const mqtt = require('mqtt');
 // Lấy các biến môi trường
 const MONGODB_URI = process.env.MONGODB_URI;
 const MQTT_BROKER = process.env.MQTT_BROKER;
+const MQTT_USER = process.env.MQTT_USER; // THÊM DÒNG NÀY
+const MQTT_PASS = process.env.MQTT_PASS; // THÊM DÒNG NÀY
 const MQTT_TOPIC_DATA = 'tlong/bangchuyen/data'; // Topic nhận dữ liệu từ ESP8266
 const PORT = process.env.PORT || 3000; 
 
@@ -40,35 +42,9 @@ const mqttClient = mqtt.connect(`mqtts://${MQTT_BROKER}:8883`); // Giữ nguyên
 // ... (các hàm on('connect') và on('error') giữ nguyên) ...
 
 // Xử lý dữ liệu nhận được từ ESP8266
-mqttClient.on('message', (topic, message) => {
-    if (topic.toString() === MQTT_TOPIC_DATA) {
-        try {
-            // Lấy chuỗi JSON từ payload
-            const jsonString = message.toString();
-
-            // SỬA: LÀM SẠCH CHUỖI JSON TRÊN BACKEND
-            // Loại bỏ khoảng trắng và ký tự xuống dòng thừa (rất quan trọng)
-            const cleanedString = jsonString.trim().replace(/[\n\r]/g, ''); 
-            
-            // Phân tích chuỗi JSON đã được làm sạch
-            const data = JSON.parse(cleanedString);
-
-            // Lưu dữ liệu vào MongoDB
-            const newRecord = new ProductModel({
-                soluong: data.soluong,
-                mau: data.mau,
-                trangthai: data.trangthai
-            });
-
-            newRecord.save()
-                .then(() => console.log(`Database: Record saved (Color: ${data.mau}).`))
-                .catch(err => console.error('Database: Error saving record:', err));
-
-        } catch (e) {
-            // Lỗi này sẽ hiển thị trong Log Render, giúp debug chuỗi JSON thô
-            console.error('Data Error: Failed to parse JSON or save:', message.toString());
-        }
-    }
+const mqttClient = mqtt.connect(`mqtts://${MQTT_BROKER}:8883`, {
+    username: MQTT_USER, // SỬA ĐÂY: Dùng biến từ Render
+    password: MQTT_PASS  // SỬA ĐÂY: Dùng biến từ Render
 });
 // Sự kiện kết nối thành công MQTT
 mqttClient.on('connect', () => {
