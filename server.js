@@ -35,7 +35,7 @@ mongoose.connect(MONGODB_URI)
 
 
 // --- 3. LOGIC MQTT (Lắng nghe và Lưu Database) ---
-const mqttClient = mqtt.connect(`mqtt://${MQTT_BROKER}`);
+const mqttClient = mqtt.connect(`mqtts://${MQTT_BROKER}:8883`);
 
 // Sự kiện kết nối thành công MQTT
 mqttClient.on('connect', () => {
