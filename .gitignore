@@ -1,0 +1,5 @@
+# Thư mục chứa tất cả các gói đã cài đặt
+node_modules/
+
+# File chứa mật khẩu và chuỗi kết nối (rất quan trọng)
+.env
