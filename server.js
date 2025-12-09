@@ -37,14 +37,9 @@ mongoose.connect(MONGODB_URI)
 
 
 // --- 3. LOGIC MQTT (Lắng nghe và Lưu Database) ---
-const mqttClient = mqtt.connect(`mqtts://${MQTT_BROKER}:8883`); // Giữ nguyên
-
-// ... (các hàm on('connect') và on('error') giữ nguyên) ...
-
-// Xử lý dữ liệu nhận được từ ESP8266
 const mqttClient = mqtt.connect(`mqtts://${MQTT_BROKER}:8883`, {
-    username: MQTT_USER, // SỬA ĐÂY: Dùng biến từ Render
-    password: MQTT_PASS  // SỬA ĐÂY: Dùng biến từ Render
+    username: MQTT_USER, 
+    password: MQTT_PASS 
 });
 // Sự kiện kết nối thành công MQTT
 mqttClient.on('connect', () => {
