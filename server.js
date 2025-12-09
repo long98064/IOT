@@ -35,8 +35,41 @@ mongoose.connect(MONGODB_URI)
 
 
 // --- 3. LOGIC MQTT (Lắng nghe và Lưu Database) ---
-const mqttClient = mqtt.connect(`mqtts://${MQTT_BROKER}:8883`);
+const mqttClient = mqtt.connect(`mqtts://${MQTT_BROKER}:8883`); // Giữ nguyên
 
+// ... (các hàm on('connect') và on('error') giữ nguyên) ...
+
+// Xử lý dữ liệu nhận được từ ESP8266
+mqttClient.on('message', (topic, message) => {
+    if (topic.toString() === MQTT_TOPIC_DATA) {
+        try {
+            // Lấy chuỗi JSON từ payload
+            const jsonString = message.toString();
+
+            // SỬA: LÀM SẠCH CHUỖI JSON TRÊN BACKEND
+            // Loại bỏ khoảng trắng và ký tự xuống dòng thừa (rất quan trọng)
+            const cleanedString = jsonString.trim().replace(/[\n\r]/g, ''); 
+            
+            // Phân tích chuỗi JSON đã được làm sạch
+            const data = JSON.parse(cleanedString);
+
+            // Lưu dữ liệu vào MongoDB
+            const newRecord = new ProductModel({
+                soluong: data.soluong,
+                mau: data.mau,
+                trangthai: data.trangthai
+            });
+
+            newRecord.save()
+                .then(() => console.log(`Database: Record saved (Color: ${data.mau}).`))
+                .catch(err => console.error('Database: Error saving record:', err));
+
+        } catch (e) {
+            // Lỗi này sẽ hiển thị trong Log Render, giúp debug chuỗi JSON thô
+            console.error('Data Error: Failed to parse JSON or save:', message.toString());
+        }
+    }
+});
 // Sự kiện kết nối thành công MQTT
 mqttClient.on('connect', () => {
     console.log(`MQTT: Connected to ${MQTT_BROKER}`);
