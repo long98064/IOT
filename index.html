@@ -1,71 +1,101 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>Conveyor IoT Dashboard - Realtime & History</title>
+    <title>Conveyor IoT Dashboard - Advanced</title>
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <script src="https://cdnjs.cloudflare.com/ajax/libs/paho-mqtt/1.0.1/mqttws31.min.js"></script>
     <style>
-        body { font-family: Arial, sans-serif; margin: 20px; background-color: #f4f4f9; }
-        .container { max-width: 900px; margin: auto; background: white; padding: 20px; border-radius: 8px; box-shadow: 0 4px 8px rgba(0,0,0,0.1); }
-        h1, h2 { color: #333; text-align: center; }
-        .data-box, .control-panel { margin-bottom: 20px; padding: 15px; border: 1px solid #ddd; border-radius: 5px; }
-        .realtime span { font-weight: bold; color: #007bff; margin-left: 10px; font-size: 1.2em; }
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; margin: 20px; background-color: #f4f4f9; }
+        .container { max-width: 900px; margin: auto; background: white; padding: 25px; border-radius: 12px; box-shadow: 0 4px 15px rgba(0,0,0,0.1); }
+        h1, h2 { color: #333; text-align: center; margin-bottom: 20px; }
         
-        .control-panel { text-align: center; }
-        button { padding: 12px 20px; margin: 5px; cursor: pointer; border: none; border-radius: 4px; color: white; font-weight: bold; transition: opacity 0.3s; }
+        .data-box { margin-bottom: 20px; padding: 20px; border: 1px solid #e0e0e0; border-radius: 8px; background-color: #fff; }
+        
+        /* REALTIME SECTION */
+        .realtime p { font-size: 16px; margin: 10px 0; border-bottom: 1px dashed #eee; padding-bottom: 5px; }
+        .realtime span { font-weight: bold; color: #007bff; float: right; font-size: 1.2em; }
+        
+        /* CONTROL PANEL */
+        .control-panel { text-align: center; background-color: #f9f9f9; }
+        button { padding: 12px 25px; margin: 8px; cursor: pointer; border: none; border-radius: 50px; color: white; font-weight: bold; transition: all 0.3s ease; box-shadow: 0 2px 5px rgba(0,0,0,0.2); }
+        button:hover { transform: translateY(-2px); box-shadow: 0 4px 8px rgba(0,0,0,0.2); }
         .btn-run { background-color: #28a745; }
-        .btn-stop { background-color: #ffc107; color: black; }
-        .btn-emergency { background-color: #dc3545; }
+        .btn-stop { background-color: #ffc107; color: #333; }
+        .btn-speed { background-color: #6f42c1; } /* Màu tím cho nút tốc độ */
         .btn-reset { background-color: #17a2b8; }
-        button:hover { opacity: 0.8; transform: scale(1.05); }
         
-        table { width: 100%; border-collapse: collapse; margin-top: 15px; }
-        th, td { border: 1px solid #ddd; padding: 10px; text-align: left; }
-        th { background-color: #007bff; color: white; }
-        tr:nth-child(even) { background-color: #f2f2f2; }
+        /* FILTER & SORT SECTION */
+        .filter-bar { display: flex; gap: 10px; margin-bottom: 15px; justify-content: space-between; flex-wrap: wrap; }
+        .filter-group { flex: 1; min-width: 200px; }
+        select { width: 100%; padding: 10px; border-radius: 5px; border: 1px solid #ccc; font-size: 14px; }
+        label { font-weight: bold; font-size: 12px; color: #666; display: block; margin-bottom: 5px; }
+
+        /* TABLE */
+        table { width: 100%; border-collapse: collapse; margin-top: 10px; font-size: 14px; }
+        th, td { border-bottom: 1px solid #eee; padding: 12px; text-align: left; }
+        th { background-color: #007bff; color: white; position: sticky; top: 0; }
+        tr:hover { background-color: #f1f1f1; }
+        
+        /* Status Tags */
+        .tag { padding: 4px 8px; border-radius: 4px; font-size: 12px; font-weight: bold; color: white; }
+        .tag-red { background-color: #dc3545; }
+        .tag-green { background-color: #28a745; }
+        .tag-blue { background-color: #007bff; }
+        .tag-other { background-color: #6c757d; }
     </style>
 </head>
 <body>
     <div class="container">
-        <h1>🎛️ Conveyor Belt IoT Dashboard</h1>
+        <h1>🎛️ Conveyor Dashboard Pro</h1>
 
         <div class="data-box realtime">
             <h2>Dữ liệu Thời gian thực</h2>
             <p>📦 Số Lượng: <span id="so_luong">--</span></p>
             <p>🎨 Màu Sắc: <span id="mau">--</span></p>
             <p>⚙️ Trạng Thái: <span id="trang_thai">--</span></p>
-            <p>📡 MQTT Status: <span id="mqtt-status" style="color:red; font-size:14px;">Disconnected</span></p>
+            <p>⚡ Tốc độ/Chế độ: <span id="hien_thi_che_do" style="color:#6f42c1">--</span></p>
+            <p style="border:none; font-size:12px; color:gray;">MQTT: <span id="mqtt-status" style="font-weight:normal; font-size:12px;">Connecting...</span></p>
         </div>
 
-       <div class="data-box control-panel">
-            <h2>Bảng Điều khiển</h2>
-            
+        <div class="data-box control-panel">
+            <h2>Điều khiển</h2>
             <button class="btn-run" onclick="publishCommand('MOTOR_RUN')">▶ CHẠY</button>
             <button class="btn-stop" onclick="publishCommand('MOTOR_STOP')">⏸ DỪNG</button>
-            <button class="btn-reset" onclick="publishCommand('RESET_COUNT')">🔄 RESET ĐẾM</button>
-            
-            <hr style="margin: 20px 0; border: 0; border-top: 1px solid #eee;">
-
-           <div style="margin-top: 15px;">
-                <p style="font-weight: bold; font-size: 18px;">
-                    ⚡ Chế độ: <span id="hien_thi_che_do" style="color: #dc3545;">MẠNH NHẤT (255)</span>
-                </p>
-                
-                <button class="btn-speed" onclick="publishCommand('CHANGE_SPEED_LEVEL')" 
-                        style="background-color: #6f42c1; width: 100%; padding: 15px; font-size: 16px;">
-                    🎚 ĐỔI TỐC ĐỘ (Mạnh -> Vừa -> Chậm)
-                </button>
-            </div>
+            <button class="btn-speed" onclick="publishCommand('CHANGE_SPEED_LEVEL')">⚡ ĐỔI TỐC ĐỘ</button>
+            <br>
+            <button class="btn-reset" onclick="publishCommand('RESET_COUNT')" style="font-size: 12px; padding: 8px 15px; margin-top: 15px;">🔄 Reset Đếm</button>
         </div>
 
         <div class="data-box history">
-            <h2>📜 Lịch sử Hoạt động (Database)</h2>
+            <h2>📜 Lịch sử & Bộ lọc</h2>
+            
+            <div class="filter-bar">
+                <div class="filter-group">
+                    <label>🔍 Lọc theo màu sắc:</label>
+                    <select id="filterColor" onchange="applyFilterAndSort()">
+                        <option value="ALL">Tất cả</option>
+                        <option value="RED">Đỏ (RED)</option>
+                        <option value="GREEN">Xanh Lá (GREEN)</option>
+                        <option value="BLUE">Xanh Dương (BLUE)</option>
+                        <option value="ERROR">Lỗi / Khác</option>
+                    </select>
+                </div>
+                <div class="filter-group">
+                    <label>🔃 Sắp xếp theo:</label>
+                    <select id="sortType" onchange="applyFilterAndSort()">
+                        <option value="NEWEST">Mới nhất trước</option>
+                        <option value="OLDEST">Cũ nhất trước</option>
+                        <option value="QTY_DESC">Số lượng (Cao -> Thấp)</option>
+                    </select>
+                </div>
+            </div>
+
             <table>
                 <thead>
                     <tr>
                         <th>Thời gian</th>
                         <th>Màu sắc</th>
-                        <th>Số lượng</th>
+                        <th>SL</th>
                         <th>Trạng thái</th>
                     </tr>
                 </thead>
@@ -76,191 +106,167 @@
     </div>
 
     <script>
-        // ================= CẤU HÌNH MQTT (Websocket Secure) =================
-        // Lưu ý: Port cho Web phải là WSS (thường là 8884 trên HiveMQ), KHÔNG PHẢI 8883
+        // === CẤU HÌNH MQTT ===
         const MQTT_SERVER = "22d9a4bac641496a885db88574135654.s1.eu.hivemq.cloud";
         const MQTT_PORT = 8884; 
-        const MQTT_USER = "tlong";      // Nhập đúng user HiveMQ của bạn
-        const MQTT_PASS = "Tlong1234";  // Nhập đúng pass HiveMQ của bạn
-        
+        const MQTT_USER = "tlong";      
+        const MQTT_PASS = "Tlong1234";  
         const MQTT_TOPIC_DATA = "tlong/bangchuyen/data";
         const MQTT_TOPIC_COMMAND = "tlong/bangchuyen/command";
-        // ====================================================================
 
         let mqttClient;
-        let isConnected = false; // Biến cờ tự quản lý trạng thái kết nối
+        // BIẾN LƯU TRỮ TOÀN BỘ DỮ LIỆU ĐỂ LỌC
+        let globalHistoryData = []; 
 
         // 1. KẾT NỐI MQTT
         function connectMQTT() {
             const clientId = "web-" + parseInt(Math.random() * 100000);
             mqttClient = new Paho.MQTT.Client(MQTT_SERVER, Number(MQTT_PORT), "/mqtt", clientId);
-
             mqttClient.onConnectionLost = onConnectionLost;
             mqttClient.onMessageArrived = onMessageArrived;
-
-            const options = {
-                useSSL: true, // HiveMQ Cloud bắt buộc SSL
-                userName: MQTT_USER,
-                password: MQTT_PASS,
-                onSuccess: onConnect,
-                onFailure: onFailure,
-                timeout: 5
-            };
-
-            console.log("Connecting to MQTT...");
-            document.getElementById("mqtt-status").innerText = "Connecting...";
-            mqttClient.connect(options);
+            mqttClient.connect({
+                useSSL: true, userName: MQTT_USER, password: MQTT_PASS,
+                onSuccess: onConnect, onFailure: onFailure
+            });
         }
-
         function onConnect() {
-            console.log("MQTT Connected!");
-            isConnected = true;
             document.getElementById("mqtt-status").innerText = "Connected ✅";
             document.getElementById("mqtt-status").style.color = "green";
-            
-            // Đăng ký nhận dữ liệu
             mqttClient.subscribe(MQTT_TOPIC_DATA);
-            
-            // Tải lịch sử lần đầu
-            loadHistoryData();
+            loadHistoryData(); // Tải lịch sử ban đầu
         }
+        function onFailure(e) { console.log(e); setTimeout(connectMQTT, 5000); }
+        function onConnectionLost(e) { if(e.errorCode!==0) setTimeout(connectMQTT, 5000); }
 
-        function onFailure(message) {
-            console.log("Connection Failed: " + message.errorMessage);
-            document.getElementById("mqtt-status").innerText = "Failed ❌ (Retrying...)";
-            setTimeout(connectMQTT, 5000); // Thử lại sau 5s
-        }
-
-        function onConnectionLost(responseObject) {
-            isConnected = false;
-            if (responseObject.errorCode !== 0) {
-                console.log("Connection Lost: " + responseObject.errorMessage);
-                document.getElementById("mqtt-status").innerText = "Lost connection ⚠️";
-                document.getElementById("mqtt-status").style.color = "red";
-                setTimeout(connectMQTT, 5000); // Thử lại
-            }
-        }
-
-        // 2. NHẬN DỮ LIỆU TỪ ESP8266 (REAL-TIME)
-       function onMessageArrived(message) {
-            if (message.destinationName === MQTT_TOPIC_DATA) {
-                try {
-                    const payload = message.payloadString.trim();
-                    const data = JSON.parse(payload);
-
-                    document.getElementById('so_luong').innerText = data.soluong;
-                    document.getElementById('mau').innerText = data.mau;
-                    document.getElementById('trang_thai').innerText = data.trangthai;
-                    
-                    // --- CẬP NHẬT HIỂN THỊ CHẾ ĐỘ TỐC ĐỘ ---
-                    if(data.tocdo) {
-                         let textStatus = "";
-                         let color = "";
-                         
-                         // Dựa vào giá trị PWM để đoán tên chế độ
-                         if (data.tocdo >= 250) {
-                             textStatus = "MẠNH NHẤT (255)"; color = "#dc3545"; // Đỏ
-                         } else if (data.tocdo >= 150) {
-                             textStatus = "TRUNG BÌNH (160)"; color = "#28a745"; // Xanh lá
-                         } else {
-                             textStatus = "CHẬM (100)"; color = "#ffc107"; // Vàng
-                         }
-                         
-                         const label = document.getElementById('hien_thi_che_do');
-                         label.innerText = textStatus;
-                         label.style.color = color;
-                    }
-
-                    addRecordToHistory(data, true);
-                } catch (e) { console.error("JSON Error:", e); }
-            }
-        }
-
-        // 3. GỬI LỆNH ĐIỀU KHIỂN (Run/Stop)
+        // 2. GỬI LỆNH
         function publishCommand(cmd) {
-            if (!isConnected) {
-                alert("Mất kết nối MQTT! Đang kết nối lại...");
-                return;
-            }
             try {
                 const message = new Paho.MQTT.Message(cmd);
                 message.destinationName = MQTT_TOPIC_COMMAND;
                 mqttClient.send(message);
-                console.log("Sent command:", cmd);
-            } catch (e) {
-                console.error("Send Error:", e);
-            }
+            } catch(e) { alert("Chưa kết nối MQTT!"); }
         }
 
-        // Hàm gửi lệnh chỉnh tốc độ
-        function updateSpeed(val) {
-            // Gửi lệnh dạng: "SPEED:200"
-            publishCommand("SPEED:" + val);
-        }
-
-        // Sửa lại hàm nhận dữ liệu để cập nhật thanh trượt nếu Arduino gửi về
+        // 3. NHẬN DỮ LIỆU (REALTIME)
         function onMessageArrived(message) {
             if (message.destinationName === MQTT_TOPIC_DATA) {
                 try {
-                    const payload = message.payloadString.trim();
-                    const data = JSON.parse(payload);
+                    const data = JSON.parse(message.payloadString.trim());
 
+                    // Cập nhật số liệu Realtime
                     document.getElementById('so_luong').innerText = data.soluong;
                     document.getElementById('mau').innerText = data.mau;
                     document.getElementById('trang_thai').innerText = data.trangthai;
                     
-                    // Cập nhật hiển thị tốc độ hiện tại từ phần cứng gửi lên
-                    if(data.tocdo) {
-                         document.getElementById('hien_thi_toc_do').innerText = data.tocdo;
-                         document.getElementById('speedRange').value = data.tocdo;
-                    }
+                    // Cập nhật Text chế độ
+                    updateSpeedText(data.tocdo);
 
-                    addRecordToHistory(data, true);
-                } catch (e) { console.error("JSON Error:", e); }
+                    // THÊM VÀO MẢNG DỮ LIỆU CHUNG VÀ VẼ LẠI BẢNG
+                    // Thêm thời gian hiện tại nếu thiếu
+                    if(!data.timestamp) data.timestamp = new Date().toISOString();
+                    
+                    globalHistoryData.unshift(data); // Thêm vào đầu mảng
+                    
+                    // Nếu mảng quá dài (>100), cắt bớt để nhẹ trình duyệt
+                    if(globalHistoryData.length > 100) globalHistoryData.pop();
+
+                    // Gọi hàm lọc để vẽ lại bảng ngay lập tức
+                    applyFilterAndSort();
+
+                } catch (e) { console.error(e); }
             }
         }
 
-        // 4. LẤY LỊCH SỬ TỪ API (Server Render)
+        // Hàm cập nhật chữ hiển thị tốc độ
+        function updateSpeedText(val) {
+            if(!val) return;
+            const lbl = document.getElementById('hien_thi_che_do');
+            if (val >= 250) { lbl.innerText = "MẠNH NHẤT (255)"; lbl.style.color = "#dc3545"; }
+            else if (val >= 150) { lbl.innerText = "TRUNG BÌNH (160)"; lbl.style.color = "#28a745"; }
+            else { lbl.innerText = "CHẬM (100)"; lbl.style.color = "#ffc107"; }
+        }
+
+        // 4. LẤY LỊCH SỬ TỪ SERVER
         async function loadHistoryData() {
             try {
-                // SỬA: Dùng đường dẫn tương đối, tự động nhận diện domain của Render
                 const response = await fetch('/api/history'); 
-                const historyData = await response.json();
-
-                const tableBody = document.getElementById('history-table-body');
-                tableBody.innerHTML = ''; // Xóa cũ
-
-                historyData.forEach(data => addRecordToHistory(data));
-
-            } catch (error) {
-                console.error("API Error:", error);
-            }
+                const data = await response.json();
+                
+                // Lưu vào biến toàn cục
+                globalHistoryData = data;
+                
+                // Vẽ bảng
+                applyFilterAndSort();
+            } catch (error) { console.error("API Error:", error); }
         }
 
-        function addRecordToHistory(data, isNew = false) {
+        // ============================================================
+        // 5. LOGIC LỌC VÀ SẮP XẾP (FILTER & SORT) - QUAN TRỌNG NHẤT
+        // ============================================================
+        function applyFilterAndSort() {
+            // Lấy giá trị đang chọn trong menu
+            const filterValue = document.getElementById('filterColor').value;
+            const sortType = document.getElementById('sortType').value;
+
+            // A. COPY mảng gốc ra để xử lý (không làm hỏng dữ liệu gốc)
+            let processedData = [...globalHistoryData];
+
+            // B. XỬ LÝ LỌC (FILTER)
+            if (filterValue !== 'ALL') {
+                processedData = processedData.filter(item => {
+                    // Nếu chọn ERROR, lấy cả KHAC và ERROR
+                    if(filterValue === 'ERROR') return item.mau === 'ERROR' || item.mau === 'KHAC' || item.mau === 'NONE';
+                    // Các màu khác thì so sánh chính xác
+                    return item.mau === filterValue;
+                });
+            }
+
+            // C. XỬ LÝ SẮP XẾP (SORT)
+            processedData.sort((a, b) => {
+                const timeA = new Date(a.timestamp || 0).getTime();
+                const timeB = new Date(b.timestamp || 0).getTime();
+
+                if (sortType === 'NEWEST') return timeB - timeA; // Mới nhất trước
+                if (sortType === 'OLDEST') return timeA - timeB; // Cũ nhất trước
+                if (sortType === 'QTY_DESC') return b.soluong - a.soluong; // Số lượng giảm dần
+                return 0;
+            });
+
+            // D. VẼ LẠI BẢNG HTML
+            renderTable(processedData);
+        }
+
+        function renderTable(dataArray) {
             const tableBody = document.getElementById('history-table-body');
-            const row = tableBody.insertRow(0); // Chèn lên đầu
+            tableBody.innerHTML = ''; // Xóa bảng cũ
 
-            // Xử lý thời gian
-            const timeStr = data.timestamp ? new Date(data.timestamp).toLocaleTimeString('vi-VN') : new Date().toLocaleTimeString('vi-VN');
-
-            row.innerHTML = `
-                <td>${timeStr}</td>
-                <td>${data.mau}</td>
-                <td>${data.soluong}</td>
-                <td>${data.trangthai}</td>
-            `;
-
-            if (isNew) {
-                row.style.backgroundColor = "#e8f5e9"; // Màu xanh nhạt cho dòng mới
-                setTimeout(() => row.style.backgroundColor = "white", 2000);
+            if(dataArray.length === 0) {
+                tableBody.innerHTML = '<tr><td colspan="4" style="text-align:center;">Không tìm thấy dữ liệu nào!</td></tr>';
+                return;
             }
+
+            dataArray.forEach(data => {
+                const row = tableBody.insertRow();
+                
+                // Xử lý màu sắc hiển thị cho đẹp
+                let colorTag = `<span class="tag tag-other">${data.mau}</span>`;
+                if(data.mau === 'RED') colorTag = `<span class="tag tag-red">RED</span>`;
+                else if(data.mau === 'GREEN') colorTag = `<span class="tag tag-green">GREEN</span>`;
+                else if(data.mau === 'BLUE') colorTag = `<span class="tag tag-blue">BLUE</span>`;
+
+                const timeStr = data.timestamp ? new Date(data.timestamp).toLocaleTimeString('vi-VN') : '--';
+
+                row.innerHTML = `
+                    <td>${timeStr}</td>
+                    <td>${colorTag}</td>
+                    <td>${data.soluong}</td>
+                    <td>${data.trangthai}</td>
+                `;
+            });
         }
 
-        // Khởi chạy
+        // Khởi động
         connectMQTT();
     </script>
 </body>
-
 </html>
-
