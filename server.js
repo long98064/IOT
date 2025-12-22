@@ -1,70 +1,74 @@
 // server.js
 
-// Tải biến môi trường từ file .env (dùng khi chạy cục bộ)
+// Tải biến môi trường
 require('dotenv').config(); 
 
-// --- CẤU HÌNH VÀ KẾT NỐI ---
+// --- 1. KHAI BÁO THƯ VIỆN & CẤU HÌNH ---
 const express = require('express');
 const mongoose = require('mongoose');
 const mqtt = require('mqtt');
-
-// Lấy các biến môi trường
-const MONGODB_URI = process.env.MONGODB_URI;
-const MQTT_BROKER = process.env.MQTT_BROKER;
-const MQTT_USER = process.env.MQTT_USER; // THÊM DÒNG NÀY
-const MQTT_PASS = process.env.MQTT_PASS; // THÊM DÒNG NÀY
-const MQTT_TOPIC_DATA = 'tlong/bangchuyen/data'; // Topic nhận dữ liệu từ ESP8266
-const PORT = process.env.PORT || 3000; 
+const path = require('path');
+const http = require('http'); // Cần thêm HTTP để chạy Socket.IO
+const { Server } = require("socket.io"); // Thư viện Real-time
 
 const app = express();
-app.use(express.json());
+const server = http.createServer(app); // Tạo server bọc lấy app express
+const io = new Server(server); // Khởi tạo Socket.IO
 
+// Lấy biến môi trường
+const MONGODB_URI = process.env.MONGODB_URI;
+const MQTT_BROKER = process.env.MQTT_BROKER;
+const MQTT_USER = process.env.MQTT_USER;
+const MQTT_PASS = process.env.MQTT_PASS;
+const MQTT_TOPIC_DATA = 'tlong/bangchuyen/data';
+const PORT = process.env.PORT || 3000; 
 
-// --- 1. ĐỊNH NGHĨA MODEL MONGODB (Sản phẩm) ---
+// --- 2. CẤU HÌNH WEB SERVER (SỬA LẠI ĐƯỜNG DẪN) ---
+
+// Phục vụ file tĩnh ngay tại thư mục gốc (nơi chứa index.html và server.js)
+app.use(express.static(__dirname));
+
+// Route trang chủ: Gửi file index.html nằm ngay cạnh server.js
+app.get('/', (req, res) => {
+    res.sendFile(path.join(__dirname, 'index.html'));
+});
+
+// --- 3. ĐỊNH NGHĨA MODEL MONGODB ---
 const ProductSchema = new mongoose.Schema({
     soluong: { type: Number, required: true },
     mau: { type: String, required: true },
     trangthai: { type: String, required: true },
-    timestamp: { type: Date, default: Date.now } // Tự động thêm thời gian ghi nhận
+    timestamp: { type: Date, default: Date.now }
 });
 const ProductModel = mongoose.model('ProductRecord', ProductSchema);
 
-
-// --- 2. KẾT NỐI MONGODB ---
+// --- 4. KẾT NỐI MONGODB ---
 mongoose.connect(MONGODB_URI)
     .then(() => console.log('MongoDB: Connected successfully.'))
     .catch(err => console.error('MongoDB: Connection error:', err));
 
-
-// --- 3. LOGIC MQTT (Lắng nghe và Lưu Database) ---
+// --- 5. LOGIC MQTT & SOCKET.IO ---
 const mqttClient = mqtt.connect(`mqtts://${MQTT_BROKER}:8883`, {
-    username: MQTT_USER, 
-    password: MQTT_PASS 
+    username: MQTT_USER,
+    password: MQTT_PASS
 });
-// Sự kiện kết nối thành công MQTT
+
 mqttClient.on('connect', () => {
     console.log(`MQTT: Connected to ${MQTT_BROKER}`);
-    // Đăng ký vào Topic DATA để nhận JSON từ ESP8266
     mqttClient.subscribe(MQTT_TOPIC_DATA, (err) => {
-        if (!err) {
-            console.log(`MQTT: Subscribed to topic: ${MQTT_TOPIC_DATA}`);
-        }
+        if (!err) console.log(`MQTT: Subscribed to topic: ${MQTT_TOPIC_DATA}`);
     });
 });
 
-// Sự kiện lỗi MQTT
-mqttClient.on('error', (err) => {
-    console.error('MQTT: Error:', err);
-});
-
-// Xử lý dữ liệu nhận được từ ESP8266
 mqttClient.on('message', (topic, message) => {
     if (topic.toString() === MQTT_TOPIC_DATA) {
         try {
-            // Phân tích chuỗi JSON: {"soluong":7, "mau":"GREEN", "trangthai":"STOP"}
-            const data = JSON.parse(message.toString());
+            const jsonString = message.toString();
+            // Làm sạch chuỗi JSON
+            const cleanedString = jsonString.trim().replace(/[\n\r]/g, ''); 
+            const data = JSON.parse(cleanedString);
 
-            // Lưu dữ liệu vào MongoDB
+            // A. Lưu vào Database
             const newRecord = new ProductModel({
                 soluong: data.soluong,
                 mau: data.mau,
@@ -72,25 +76,22 @@ mqttClient.on('message', (topic, message) => {
             });
 
             newRecord.save()
-                .then(() => console.log(`Database: Record saved (Color: ${data.mau}).`))
-                .catch(err => console.error('Database: Error saving record:', err));
+                .then(() => console.log(`DB Saved: ${data.mau}`))
+                .catch(err => console.error('DB Save Error:', err));
+
+            // B. Gửi tín hiệu ngay lập tức xuống Web (Socket.IO)
+            // Để web cập nhật mà không cần F5
+            io.emit('mqtt-data', data); 
 
         } catch (e) {
-            console.error('Data Error: Failed to parse JSON or save:', message.toString());
+            console.error('Data Error:', message.toString());
         }
     }
 });
 
-
-// --- 4. EXPRESS API ENDPOINT ---
-
-// API Endpoint để lấy lịch sử dữ liệu (Web Dashboard sẽ gọi API này)
+// --- 6. API ENDPOINT (LẤY LỊCH SỬ) ---
 app.get('/api/history', async (req, res) => {
     try {
-        // Cho phép truy cập từ Web Dashboard tĩnh (CORS)
-        res.header('Access-Control-Allow-Origin', '*'); 
-        
-        // Lấy 50 bản ghi mới nhất, sắp xếp theo thời gian mới nhất (giảm dần)
         const history = await ProductModel.find().sort({ timestamp: -1 }).limit(50);
         res.json(history);
     } catch (err) {
@@ -98,8 +99,8 @@ app.get('/api/history', async (req, res) => {
     }
 });
 
-
-// --- 5. BẮT ĐẦU SERVER ---
-app.listen(PORT, () => {
-    console.log(`Server: Backend running on http://localhost:${PORT}`);
+// --- 7. BẮT ĐẦU SERVER ---
+// Lưu ý: Dùng server.listen thay vì app.listen để Socket.IO hoạt động
+server.listen(PORT, () => {
+    console.log(`Server: Running on port ${PORT}`);
 });
