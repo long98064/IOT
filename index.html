@@ -46,15 +46,15 @@
             
             <hr style="margin: 20px 0; border: 0; border-top: 1px solid #eee;">
 
-            <div style="margin-top: 15px;">
-                <label for="speedRange" style="font-weight: bold; font-size: 18px;">
-                    ⚡ Tốc độ: <span id="hien_thi_toc_do" style="color: #007bff;">200</span>
-                </label>
-                <br><br>
-                <input type="range" id="speedRange" min="80" max="255" value="200" 
-                       style="width: 100%; cursor: pointer;" 
-                       onchange="updateSpeed(this.value)" 
-                       oninput="document.getElementById('hien_thi_toc_do').innerText = this.value">
+           <div style="margin-top: 15px;">
+                <p style="font-weight: bold; font-size: 18px;">
+                    ⚡ Chế độ: <span id="hien_thi_che_do" style="color: #dc3545;">MẠNH NHẤT (255)</span>
+                </p>
+                
+                <button class="btn-speed" onclick="publishCommand('CHANGE_SPEED_LEVEL')" 
+                        style="background-color: #6f42c1; width: 100%; padding: 15px; font-size: 16px;">
+                    🎚 ĐỔI TỐC ĐỘ (Mạnh -> Vừa -> Chậm)
+                </button>
             </div>
         </div>
 
@@ -142,24 +142,37 @@
         }
 
         // 2. NHẬN DỮ LIỆU TỪ ESP8266 (REAL-TIME)
-        function onMessageArrived(message) {
+       function onMessageArrived(message) {
             if (message.destinationName === MQTT_TOPIC_DATA) {
                 try {
                     const payload = message.payloadString.trim();
-                    console.log("Data received:", payload);
                     const data = JSON.parse(payload);
 
-                    // Cập nhật giao diện
                     document.getElementById('so_luong').innerText = data.soluong;
                     document.getElementById('mau').innerText = data.mau;
                     document.getElementById('trang_thai').innerText = data.trangthai;
+                    
+                    // --- CẬP NHẬT HIỂN THỊ CHẾ ĐỘ TỐC ĐỘ ---
+                    if(data.tocdo) {
+                         let textStatus = "";
+                         let color = "";
+                         
+                         // Dựa vào giá trị PWM để đoán tên chế độ
+                         if (data.tocdo >= 250) {
+                             textStatus = "MẠNH NHẤT (255)"; color = "#dc3545"; // Đỏ
+                         } else if (data.tocdo >= 150) {
+                             textStatus = "TRUNG BÌNH (160)"; color = "#28a745"; // Xanh lá
+                         } else {
+                             textStatus = "CHẬM (100)"; color = "#ffc107"; // Vàng
+                         }
+                         
+                         const label = document.getElementById('hien_thi_che_do');
+                         label.innerText = textStatus;
+                         label.style.color = color;
+                    }
 
-                    // Thêm vào bảng lịch sử ngay lập tức (không cần tải lại)
                     addRecordToHistory(data, true);
-
-                } catch (e) {
-                    console.error("JSON Error:", e);
-                }
+                } catch (e) { console.error("JSON Error:", e); }
             }
         }
 
@@ -250,3 +263,4 @@
 </body>
 
 </html>
+
