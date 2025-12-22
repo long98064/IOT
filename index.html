@@ -37,13 +37,25 @@
             <p>📡 MQTT Status: <span id="mqtt-status" style="color:red; font-size:14px;">Disconnected</span></p>
         </div>
 
-        <div class="data-box control-panel">
+       <div class="data-box control-panel">
             <h2>Bảng Điều khiển</h2>
+            
             <button class="btn-run" onclick="publishCommand('MOTOR_RUN')">▶ CHẠY</button>
             <button class="btn-stop" onclick="publishCommand('MOTOR_STOP')">⏸ DỪNG</button>
             <button class="btn-reset" onclick="publishCommand('RESET_COUNT')">🔄 RESET ĐẾM</button>
-            <br><br>
-            <button class="btn-emergency" onclick="publishCommand('EMERGENCY_STOP')">🚨 DỪNG KHẨN CẤP 🚨</button>
+            
+            <hr style="margin: 20px 0; border: 0; border-top: 1px solid #eee;">
+
+            <div style="margin-top: 15px;">
+                <label for="speedRange" style="font-weight: bold; font-size: 18px;">
+                    ⚡ Tốc độ: <span id="hien_thi_toc_do" style="color: #007bff;">200</span>
+                </label>
+                <br><br>
+                <input type="range" id="speedRange" min="80" max="255" value="200" 
+                       style="width: 100%; cursor: pointer;" 
+                       onchange="updateSpeed(this.value)" 
+                       oninput="document.getElementById('hien_thi_toc_do').innerText = this.value">
+            </div>
         </div>
 
         <div class="data-box history">
@@ -167,6 +179,34 @@
             }
         }
 
+        // Hàm gửi lệnh chỉnh tốc độ
+        function updateSpeed(val) {
+            // Gửi lệnh dạng: "SPEED:200"
+            publishCommand("SPEED:" + val);
+        }
+
+        // Sửa lại hàm nhận dữ liệu để cập nhật thanh trượt nếu Arduino gửi về
+        function onMessageArrived(message) {
+            if (message.destinationName === MQTT_TOPIC_DATA) {
+                try {
+                    const payload = message.payloadString.trim();
+                    const data = JSON.parse(payload);
+
+                    document.getElementById('so_luong').innerText = data.soluong;
+                    document.getElementById('mau').innerText = data.mau;
+                    document.getElementById('trang_thai').innerText = data.trangthai;
+                    
+                    // Cập nhật hiển thị tốc độ hiện tại từ phần cứng gửi lên
+                    if(data.tocdo) {
+                         document.getElementById('hien_thi_toc_do').innerText = data.tocdo;
+                         document.getElementById('speedRange').value = data.tocdo;
+                    }
+
+                    addRecordToHistory(data, true);
+                } catch (e) { console.error("JSON Error:", e); }
+            }
+        }
+
         // 4. LẤY LỊCH SỬ TỪ API (Server Render)
         async function loadHistoryData() {
             try {
@@ -208,4 +248,5 @@
         connectMQTT();
     </script>
 </body>
+
 </html>
